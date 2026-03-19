@@ -10,7 +10,9 @@ kbpf-sentinel introduces a kernel-level enforcement layer for eBPF, ensuring tha
 
 Unlike traditional eBPF workflows that rely solely on user-space control, this project enforces constraints directly in the kernel, reducing trust on user-space and improving system security.
 
-### Motivation
+---
+
+## Motivation
 
 Linux provides safety guarantees through the BPF verifier and access control via capabilities and LSM.
 
@@ -33,7 +35,7 @@ kbpf-sentinel introduces a focused kernel-level enforcement layer for controllin
 
 kbpf-sentinel introduces a kernel-level enforcement layer between user-space and eBPF execution.
 
-<img width="851" height="331" alt="architecture" src="https://github.com/user-attachments/assets/cf40db5f-2161-464d-b2c2-aab5affdc891" />
+<img width="851" height="331" alt="architecture" src="https://github.com/user-attachments/assets/a5f0aef0-500a-40e2-b39f-b4c1bfbe6a61" />
 
 ### Flow
 
@@ -57,8 +59,8 @@ kbpf-sentinel (Meta-Control / Enforcement)
 eBPF Program (Data Plane)
 ```
 
-- Traditional systems control behavior
-- kbpf-sentinel controls how that behavior is allowed to be installed
+- Traditional systems control behavior  
+- kbpf-sentinel controls how that behavior is allowed to be installed  
 
 ---
 
@@ -66,14 +68,16 @@ eBPF Program (Data Plane)
 
 Linux already provides several mechanisms for security and control, but they operate at different layers.
 
-- **LSM (SELinux/AppArmor)** focuses on process-level permissions (who can act)
+- **LSM (SELinux/AppArmor)** focuses on process-level permissions (who can act)  
+  While LSM can restrict access to the `bpf()` syscall, it does not provide fine-grained control over where eBPF programs are attached.
+
 - **Cilium / eBPF tools** control network behavior (what to do)
 
 kbpf-sentinel focuses on:
 
 > **How eBPF programs are allowed to be used**
 
-It enforces attachment-level policies directly in the kernel, which is not centrally handled by existing mechanisms.
+It enforces attachment-level policies directly in the kernel, which are not commonly enforced in a centralized or dedicated manner by existing mechanisms.
 
 ---
 
@@ -81,8 +85,8 @@ It enforces attachment-level policies directly in the kernel, which is not centr
 
 kbpf-sentinel follows a defense-in-depth model:
 
-- User-space defines policy (flexible, dynamic)
-- Kernel enforces non-bypassable constraints (strict, minimal)
+- User-space defines policy (flexible, dynamic)  
+- Kernel enforces non-bypassable constraints (strict, minimal)  
 
 ### Key Principle
 
@@ -91,25 +95,28 @@ kbpf-sentinel follows a defense-in-depth model:
 
 ---
 
-## Future Work: Advanced Security Model
+## High-Security Design (Planned)
 
-The system is designed to support stronger security guarantees:
+For high-security environments, kbpf-sentinel can be extended with a multi-layer protection model:
 
-### 1. Identity Integrity (Digital Signature)
+### 1. Policy Integrity (Signature / Hash Validation)
 
-- eBPF programs can be cryptographically signed
-- Kernel verifies signatures using a trusted public key
-- Prevents loading tampered or malicious bytecode
+- Policy files can be signed or hashed
+- Kernel verifies integrity before accepting policy updates
+- Prevents unauthorized or tampered policy injection
 
-### 2. Context Binding (Hardware Identity)
+### 2. Context-Aware Enforcement (Core Feature)
 
-- Policies bind programs to specific interfaces (e.g., MAC / PCI ID)
-- Prevents misuse of legitimate tools on sensitive interfaces
+- Programs are bound to specific interfaces (e.g., MAC / PCI ID)
+- Prevents misuse of legitimate eBPF tools on unintended interfaces
 
-### 3. Threat Protection
+### 3. Runtime Enforcement (Primary Layer)
 
-- Mitigates "living-off-the-land" attacks
-- Limits damage even if user-space is compromised
+- Every attach request is validated in kernel space
+- Ensures constraints are enforced even if user-space is compromised
+
+> Signature protects **what is loaded**,  
+> kbpf-sentinel enforces **how it is used**.
 
 ---
 
@@ -133,10 +140,11 @@ Kernel log:
 
 ## Design Philosophy
 
-- Minimal kernel footprint
-- Explicit trust boundary
-- Policy in user-space, enforcement in kernel
-- Security over convenience
+- Minimal kernel footprint  
+- Explicit trust boundary  
+- Policy in user-space, enforcement in kernel  
+- Security over convenience  
+- Incremental security (enforcement first, integrity later)
 
 ---
 
