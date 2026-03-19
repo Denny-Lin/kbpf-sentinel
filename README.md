@@ -12,9 +12,11 @@ Unlike traditional eBPF workflows that rely solely on user-space control, this p
 
 ### Motivation
 
-While Linux provides safety guarantees through the BPF verifier and access control via capabilities and LSM, it lacks a centralized mechanism to enforce fine-grained policies on where and how eBPF programs are attached.
+Linux provides safety guarantees through the BPF verifier and access control via capabilities and LSM.
 
-kbpf-sentinel fills this gap by introducing a kernel-level enforcement layer for eBPF attachment behavior.
+However, there is no dedicated and commonly-used mechanism to enforce fine-grained policies specifically on how eBPF programs are attached (e.g., interface-level constraints).
+
+kbpf-sentinel introduces a focused kernel-level enforcement layer for controlling eBPF attachment behavior.
 
 ---
 
