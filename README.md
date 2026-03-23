@@ -20,23 +20,11 @@ While Linux provides safety via the BPF verifier and access control via LSM/Capa
 
 ---
 
-## Features (v1)
-
-- **Type Restriction**: Strictly limit eBPF programs to XDP.
-- **Interface Binding**: Restrict attachment to authorized interfaces (e.g., `eth0`).
-- **Kernel-Level Validation**: Intercept and validate attach requests within kernel-space.
-- **Audit Logging**: Real-time logging of unauthorized attempts via `printk`.
-- **Hybrid Compilation Support**: The source code supports both **Loadable Kernel Module (LKM)** and **Built-in** modes via conditional compilation (`#ifdef MODULE`). This allows developers to use LKM for rapid prototyping while enabling immutable, non-removable enforcement for high-security production environments.
-
----
-
 ## Architecture
 
 kbpf-sentinel operates as a security layer between the user-space loader and the kernel's eBPF subsystem.
 
 ![architecture](https://github.com/user-attachments/assets/a5f0aef0-500a-40e2-b39f-b4c1bfbe6a61)
-
----
 
 ### Logic Flow
 
@@ -45,6 +33,29 @@ kbpf-sentinel operates as a security layer between the user-space loader and the
 3. **Decision**: 
    - **Allowed**: Program is attached to the XDP hook.
    - **Rejected**: Operation is blocked and logged.
+
+---
+
+## Security Design: Defense-in-Depth
+
+### 1. Hybrid Compilation Support
+The source code supports both **Loadable Kernel Module (LKM)** and **Built-in** modes via conditional compilation (`#ifdef MODULE`). This allows developers to use LKM for rapid prototyping while enabling **immutable, non-removable enforcement** for high-security production environments.
+
+### 2. Defense Against Privileged Escalation (Root)
+**kbpf-sentinel** assumes a **Zero-Trust** model where even a Root user may be compromised:
+- **Cryptographic Identity (Signing)**: All sentinel components and policy files are designed to be digitally signed. 
+- **Integrity Enforcement**: Since an attacker lacks the private key, they cannot modify the sentinel's logic or fake a policy. The kernel will reject any unsigned or tampered code.
+- **Fail-Secure**: While a Root user may delete the sentinel to cause a Denial-of-Service, they **cannot bypass** the enforcement logic by impersonating a legitimate sentinel.
+
+---
+
+## Features (v1)
+
+- **Type Restriction**: Strictly limit eBPF programs to XDP.
+- **Interface Binding**: Restrict attachment to authorized interfaces (e.g., `eth0`).
+- **Kernel-Level Validation**: Intercept and validate attach requests within kernel-space.
+- **Audit Logging**: Real-time logging of unauthorized attempts via `printk`.
+- **Hybrid Compilation Support**: The source code supports both **Loadable Kernel Module (LKM)** and **Built-in** modes via conditional compilation (`#ifdef MODULE`). This allows developers to use LKM for rapid prototyping while enabling immutable, non-removable enforcement for high-security production environments.
 
 ---
 
