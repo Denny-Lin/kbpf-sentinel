@@ -1,5 +1,9 @@
 .DS_Store
 
+# --- Build Outputs (DO NOT PUSH) ---
+Image
+*.cpio.gz
+
 # --- External Sources (Prevent huge commits) ---
 kernel-src/
 linux-*/
