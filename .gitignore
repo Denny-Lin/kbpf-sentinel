@@ -1,4 +1,11 @@
- --- Kernel Specific Hidden Files (IMPORTANT) ---
+.DS_Store
+
+# --- External Sources (Prevent huge commits) ---
+kernel-src/
+linux-*/
+*.tar.xz
+ 
+# --- Kernel Specific Hidden Files (IMPORTANT) ---
 .*.cmd                # Kernel build command logs (Crucial!)
 .tmp_*                # Temporary build directories
 .cache.mk             # Build cache files
