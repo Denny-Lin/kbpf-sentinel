@@ -138,6 +138,33 @@ Kernel log:
 
 ---
 
+## Testing and Verification
+
+To verify the sentinel enforcement, we use a minimalist **BusyBox-based rootfs** in **QEMU (ARM64)**. 
+
+### Execution Flow in QEMU:
+
+1. **Load the Sentinel LKM**:
+```bash
+insmod /mnt/kmod/sentinel_main.ko
+# Kernel Log: KBPF-Sentinel: Sentinel LKM engine initialized. Enforcement active.
+```
+2. **Test Authorized Interface (eth0)**:
+```bash
+ip link set eth0 up
+# Kernel Log: KBPF-Sentinel: [PASS] Authorized interface eth0 detected.
+```
+3. **Test Unauthorized Interface (lo)**:
+```bash
+ip link set lo up
+# Kernel Log: KBPF-Sentinel: [BLOCK] Unauthorized interface lo detected. Enforcing policy.
+```
+
+## Live Demo (Screenshot)
+<img width="689" height="170" alt="Screenshot 2026-03-22 at 7 45 27 PM" src="https://github.com/user-attachments/assets/27e02c31-af3a-429a-8f73-25abeba41db4" />
+
+---
+
 ## Design Philosophy
 
 - Minimal kernel footprint  
