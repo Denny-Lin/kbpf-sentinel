@@ -55,7 +55,6 @@ The source code supports both **Loadable Kernel Module (LKM)** and **Built-in** 
 - **Interface Binding**: Restrict attachment to authorized interfaces (e.g., `eth0`).
 - **Kernel-Level Validation**: Intercept and validate attach requests within kernel-space.
 - **Audit Logging**: Real-time logging of unauthorized attempts via `printk`.
-- **Hybrid Compilation Support**: The source code supports both **Loadable Kernel Module (LKM)** and **Built-in** modes via conditional compilation (`#ifdef MODULE`). This allows developers to use LKM for rapid prototyping while enabling immutable, non-removable enforcement for high-security production environments.
 
 ---
 
