@@ -6,175 +6,136 @@ A kernel-level eBPF enforcement module that acts as a sentinel, enforcing safe a
 
 ## Overview
 
-kbpf-sentinel introduces a kernel-level enforcement layer for eBPF, ensuring that only permitted programs can be attached to network interfaces.
+**kbpf-sentinel** introduces a kernel-level enforcement layer for eBPF, ensuring that only permitted programs can be attached to authorized network interfaces. 
 
-Unlike traditional eBPF workflows that rely solely on user-space control, this project enforces constraints directly in the kernel, reducing trust on user-space and improving system security.
+Unlike traditional eBPF workflows that rely solely on user-space control, this project enforces security constraints directly within the kernel, reducing reliance on untrusted user-space tools and significantly hardening system security.
 
 ---
 
 ## Motivation
 
-Linux provides safety guarantees through the BPF verifier and access control via capabilities and LSM.
+While Linux provides safety via the BPF verifier and access control via LSM/Capabilities, there is no dedicated, lightweight mechanism to enforce fine-grained policies on **where** and **how** eBPF programs are attached (e.g., interface-specific binding).
 
-However, there is no dedicated and commonly-used mechanism to enforce fine-grained policies specifically on how eBPF programs are attached (e.g., interface-level constraints).
-
-kbpf-sentinel introduces a focused kernel-level enforcement layer for controlling eBPF attachment behavior.
+**kbpf-sentinel** fills this gap by acting as a specialized gatekeeper for eBPF attachment behavior.
 
 ---
 
 ## Features (v1)
 
-- Restrict eBPF program type to XDP
-- Limit attachment to specific interfaces (e.g., eth0)
-- Kernel-level validation of attach requests
-- Basic audit logging via printk
+- **Type Restriction**: Strictly limit eBPF programs to XDP.
+- **Interface Binding**: Restrict attachment to authorized interfaces (e.g., `eth0`).
+- **Kernel-Level Validation**: Intercept and validate attach requests within kernel-space.
+- **Audit Logging**: Real-time logging of unauthorized attempts via `printk`.
 
 ---
 
 ## Architecture
 
-kbpf-sentinel introduces a kernel-level enforcement layer between user-space and eBPF execution.
+kbpf-sentinel operates as a security layer between the user-space loader and the kernel's eBPF subsystem.
 
-<img width="851" height="331" alt="architecture" src="https://github.com/user-attachments/assets/a5f0aef0-500a-40e2-b39f-b4c1bfbe6a61" />
-
-### Flow
-
-1. User-space loads eBPF programs (libbpf / iproute2)
-2. An attach request is issued to the kernel
-3. kbpf-sentinel intercepts the attach request and enforces constraints (program type, interface, policy)
-4. If allowed, the eBPF program is attached (e.g., XDP)
-5. Otherwise, the request is rejected and logged
-
-> kbpf-sentinel acts as a kernel-level gatekeeper, enforcing attach policies before execution.
+![architecture](https://github.com/user-attachments/assets/a5f0aef0-500a-40e2-b39f-b4c1bfbe6a61)
 
 ---
 
-## Control vs Meta-Control
+### Logic Flow
 
+1. **User-space**: Requests eBPF attachment (via `libbpf` or `iproute2`).
+2. **Sentinel (LKM)**: Intercepts the request and evaluates against the kernel policy.
+3. **Decision**: 
+   - **Allowed**: Program is attached to the XDP hook.
+   - **Rejected**: Operation is blocked and logged.
+
+---
+
+## Development Workflow (Mac M5 Pro / ARM64)
+
+This project utilizes a specialized cross-platform workflow to handle Linux Kernel development on Apple Silicon (ARM64).
+
+### 1. Build Environment
+- **Docker-based Toolchain**: Native ARM64 Ubuntu container for high-performance compilation.
+- **I/O Optimization**: To avoid macOS **VirtioFS bottlenecks** during kernel extraction (preventing `Directory renamed` errors), the Linux Kernel source is stored and prepared in the container's **native overlay filesystem** (`/root/kernel-build/`).
+
+### 2. Kernel Preparation
+To resolve symbols like `_printk` and `strcmp`, we perform a targeted symbol table generation:
+```bash
+# Inside Docker
+cd /root/kernel-build/kernel-src
+make defconfig
+make modules_prepare
+make vmlinux   # Generate vmlinux.symvers for symbol resolution
+cp vmlinux.symvers Module.symvers
 ```
-User-space (Control Plane)
-  ↓
-kbpf-sentinel (Meta-Control / Enforcement)
-  ↓
-eBPF Program (Data Plane)
+
+## Testing and Verification
+
+Validation is performed using a minimalist **BusyBox-based rootfs** inside **QEMU (ARM64)**.
+
+### Execution in QEMU:
+
+1. **Load the Sentinel LKM**:
+```bash
+insmod /mnt/kmod/sentinel_main.ko
+# Log: KBPF-Sentinel: Sentinel LKM engine initialized. Enforcement active.
+```
+   
+2. **Verify Authorized Interface (eth0)**:
+```bash
+ip link set eth0 up
+# Log: KBPF-Sentinel: [PASS] Authorized interface eth0 detected.
+```
+3. **Verify Unauthorized Interface (lo)**:
+```bash
+ip link set lo up
+# Log: KBPF-Sentinel: [BLOCK] Unauthorized interface lo detected. Enforcing policy.
 ```
 
-- Traditional systems control behavior  
-- kbpf-sentinel controls how that behavior is allowed to be installed  
+### Live Demo (Kernel Logs)
 
----
+> [!IMPORTANT]
+> The image below demonstrates the **kbpf-sentinel** successfully identifying and blocking an unauthorized `lo` interface activation while permitting `eth0`.
 
-## Why Not LSM / Cilium?
-
-Linux already provides several mechanisms for security and control, but they operate at different layers.
-
-- **LSM (SELinux/AppArmor)** focuses on process-level permissions (who can act)  
-  While LSM can restrict access to the `bpf()` syscall, it does not provide fine-grained control over where eBPF programs are attached.
-
-- **Cilium / eBPF tools** control network behavior (what to do)
-
-kbpf-sentinel focuses on:
-
-> **How eBPF programs are allowed to be used**
-
-It enforces attachment-level policies directly in the kernel, which are not commonly enforced in a centralized or dedicated manner by existing mechanisms.
-
----
-
-## Security Design
-
-kbpf-sentinel follows a defense-in-depth model:
-
-- User-space defines policy (flexible, dynamic)  
-- Kernel enforces non-bypassable constraints (strict, minimal)  
-
-### Key Principle
-
-> The kernel does not decide what to do,  
-> it enforces what must not be violated.
+<img width="689" height="170" alt="Screenshot 2026-03-22 at 7 45 27 PM" src="https://github.com/user-attachments/assets/97e952ed-716f-402e-8c0e-40fca8ab6cdc" />
 
 ---
 
 ## High-Security Design (Planned)
 
-For high-security environments, kbpf-sentinel can be extended with a multi-layer protection model:
+- **Policy Integrity**: Cryptographic signature validation for security policies.
+- **Hardware Identity Binding**: Binding programs to immutable identifiers like MAC or PCI IDs.
+- **LSM Integration**: Transitioning from event-notifiers to proactive LSM hooks for pre-attach blocking.
 
-### 1. Policy Integrity (Signature / Hash Validation)
+## Roadmap: Towards v2 (Enforcement & Dynamic Policy)
 
-- Policy files can be signed or hashed
-- Kernel verifies integrity before accepting policy updates
-- Prevents unauthorized or tampered policy injection
+The next evolution (**v2**) will transition **kbpf-sentinel** from passive auditing to **proactive, software-defined enforcement**.
 
-### 2. Context-Aware Enforcement (Core Feature)
+### v2 Architecture: Dynamic Policy Orchestration
 
-- Programs are bound to specific interfaces (e.g., MAC / PCI ID)
-- Prevents misuse of legitimate eBPF tools on unintended interfaces
+> [!TIP]
+> In **v2**, we introduce a **sysfs-based orchestration layer**. This allows administrators to push security policies into the kernel without recompiling the LKM, creating a **Software-Defined Security Gatekeeper**.
 
-### 3. Runtime Enforcement (Primary Layer)
+<img width="1536" height="1024" alt="v2 architecture" src="https://github.com/user-attachments/assets/3ae5eef5-f956-44f8-9905-cf0fe1d94cba" />
 
-- Every attach request is validated in kernel space
-- Ensures constraints are enforced even if user-space is compromised
+### Key v2 Enhancements:
 
-> Signature protects **what is loaded**,  
-> kbpf-sentinel enforces **how it is used**.
+1. **Proactive Blocking (LSM Hooks)**:
+   - **Target Hook**: `security_bpf_prog_attach`
+   - **Mechanism**: Move the interception point from post-event notifiers to proactive LSM hooks.
+   - **Result**: Unauthorized `ip link` commands will be **immediately rejected** with `Operation not permitted`.
 
----
+2. **Dynamic Policy Loading (sysfs Interface)**:
+   - **Interface**: `/sys/kernel/sentinel/policy`
+   - **Mechanism**: Implements `kobject` attributes with `store()` and `show()` handlers, allowing tools to `echo` new whitelists into the running kernel.
 
-## Example
+3. **Cryptographic Signature Verification**:
+   - **Security**: The sentinel will verify a **digital signature** attached to any new policy before applying it in kernel-space, ensuring policy integrity.
 
-```bash
-# Allowed
-ip link set dev eth0 xdp obj prog.o
-
-# Rejected by kbpf-sentinel
-ip link set dev lo xdp obj prog.o
-```
-
-Kernel log:
-
-```
-[KBPF] Reject: interface lo not allowed
-```
-
----
-
-## Testing and Verification
-
-To verify the sentinel enforcement, we use a minimalist **BusyBox-based rootfs** in **QEMU (ARM64)**. 
-
-### Execution Flow in QEMU:
-
-1. **Load the Sentinel LKM**:
-```bash
-insmod /mnt/kmod/sentinel_main.ko
-# Kernel Log: KBPF-Sentinel: Sentinel LKM engine initialized. Enforcement active.
-```
-2. **Test Authorized Interface (eth0)**:
-```bash
-ip link set eth0 up
-# Kernel Log: KBPF-Sentinel: [PASS] Authorized interface eth0 detected.
-```
-3. **Test Unauthorized Interface (lo)**:
-```bash
-ip link set lo up
-# Kernel Log: KBPF-Sentinel: [BLOCK] Unauthorized interface lo detected. Enforcing policy.
-```
-
-## Live Demo (Screenshot)
-<img width="689" height="170" alt="Screenshot 2026-03-22 at 7 45 27 PM" src="https://github.com/user-attachments/assets/27e02c31-af3a-429a-8f73-25abeba41db4" />
+4. **Observability**:
+   - Integrated support for real-time **violation counters** and status monitoring via the sysfs interface.
 
 ---
 
 ## Design Philosophy
 
-- Minimal kernel footprint  
-- Explicit trust boundary  
-- Policy in user-space, enforcement in kernel  
-- Security over convenience  
-- Incremental security (enforcement first, integrity later)
-
----
-
-## License
-
-GPL-2.0
+- **Minimal Footprint**: Lightweight LKM for minimal performance overhead.
+- **Explicit Trust Boundary**: Never trust user-space inputs.
+- **Fail-Fast**: Reject unauthorized requests at the earliest possible stage.
