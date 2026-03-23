@@ -1,3 +1,19 @@
+ --- Kernel Specific Hidden Files (IMPORTANT) ---
+.*.cmd                # Kernel build command logs (Crucial!)
+.tmp_*                # Temporary build directories
+.cache.mk             # Build cache files
+
+# --- eBPF Specific ---
+bpf/*.ll              # Intermediate LLVM IR files
+bpf/*.bc              # Intermediate bitcode files
+
+# --- Mac OS Specific ---
+.DS_Store             # Mac system files (Don't let these leak into GitHub!)
+
+# --- Project specific ---
+vmlinuz               # Compressed kernel images
+rootfs.img            # QEMU rootfs images
+
 # Prerequisites
 *.d
 
